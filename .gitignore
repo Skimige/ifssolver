@@ -1,6 +1,7 @@
-# IFS related resources
+# project related resources
 *.jpg
 data/
+config.ini
 
 # Python files
 __pycache__
