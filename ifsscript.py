@@ -21,18 +21,19 @@ def create_config(filename):
     config_raw = ConfigParser()
     config_raw.read(filename, encoding='utf-8')
     config['cookies'] = config_raw.get('Crawl', 'COOKIES', raw=True)
+    config['prefix'] = config_raw.get('General', 'PREFIX', raw=True)
     config['map_config'] = {}
     config['map_config']['lat'] = config_raw.getfloat('Crawl', 'LAT')
     config['map_config']['lng'] = config_raw.getfloat('Crawl', 'LNG')
     config['map_config']['rad'] = config_raw.getfloat('Crawl', 'RADIUS')
-    config['portals_csv'] = config_raw.get('Crawl', 'PORTALS_CSV', raw=True)
-    config['portals_image_dir'] = config_raw.get('Crawl', 'IMAGE_DIR', raw=True)
+    config['portals_csv'] = config['prefix'] + '/' + config_raw.get('Crawl', 'PORTALS_CSV', raw=True)
+    config['portals_image_dir'] = config['prefix'] + '/' + config_raw.get('Crawl', 'IMAGE_DIR', raw=True)
     config['solver_config'] = {}
-    config['solver_config']['target'] = config_raw.get('Solver', 'TARGET', raw=True)
+    config['solver_config']['target'] = config['prefix'] + '/' + config_raw.get('Solver', 'TARGET', raw=True)
     config['solver_config']['y_start'] = config_raw.getint('Solver', 'Y_START')
     config['solver_config']['y_end'] = config_raw.getint('Solver', 'Y_END')
-    config['solver_config']['output'] = config_raw.get('Solver', 'OUTPUT', raw=True)
-    config['solver_config']['spilt_result'] = config_raw.get('Solver', 'SPILT_RESULT', raw=True)
+    config['solver_config']['output'] = config['prefix'] + '/' + config_raw.get('Solver', 'OUTPUT', raw=True)
+    config['solver_config']['spilt_result'] = config['prefix'] + '/' + config_raw.get('Solver', 'SPILT_RESULT', raw=True)
     config['solver_config']['thresh'] = config_raw.getint('Solver', 'THRESH')
     return config
 
@@ -79,7 +80,7 @@ def drawSpiltResult(filename, img_path, rect_list):
         x, y, h, w = rect
         cv.rectangle(img, (x, y), (x+h-1, y+w-1), (0, 0, 255), thickness=1)
     cv.imwrite(filename, img)
-    print(f'[!] 图像分割结果保存到 {filename}')
+    print(f'INFO\t图像分割结果保存到 {filename}')
 
 
 async def crop(img, rect):
@@ -105,17 +106,17 @@ async def solver(config):
     canvas = await asyncio.to_thread(Canvas.create, map_)
 
     for n, col in enumerate(map_):
-        print(f'[!] 正在处理第{n+1}列图像中...')
+        print(f'INFO\t正在处理第 {n+1} 列图像...')
         result = [await hash_db.match(await crop(img, rect_list[num])) for num in col]
         if any(result):
             await asyncio.to_thread(canvas.drawGlyph, n, result)
         if None in result:
             await asyncio.to_thread(canvas.drawUnderline, n)
             row_notfound = ','.join(str(n) for n, r in enumerate(result) if r is None)
-            print(f'[!!!] 第{n+1}列图像中第{row_notfound}个结果不存在')
+            print(f'WARN\t第 {n+1} 列图像中第 {row_notfound} 个结果不存在')
 
     await asyncio.to_thread(canvas.save, sc['output'])
-    print(f"[!] Passcode的图像保存到 {sc['output']}")
+    print(f"INFO\tPasscode 的图像保存到 {sc['output']}")
 
 
 if __name__ == '__main__':
@@ -136,26 +137,24 @@ if __name__ == '__main__':
 
     config_path = Path(args.config)
     if not config_path.exists():
-        print(f'[!] configure file \'{str(config_path)}\' not found.')
+        print(f'ERROR\t没有找到配置文件 \'{str(config_path)}\'')
         sys.exit()
-    print(f'[!] 正在使用配置文件({str(config_path)})运行程序')
+    print(f'INFO\t正在使用配置文件 {str(config_path)} 运行程序')
     config = create_config(str(config_path))
 
-    # 选择Windows上的事件循环
+    # 选择 Windows 上的事件循环
     if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith('win'):
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     async def update():
-        print('[!] 开始更新元数据...')
+        print('INFO\t开始更新元数据...')
         await PortalUtils.crawl(config['cookies'], config['map_config'], config['portals_csv'])
-        print('')
 
 
     async def download():
-        print('[!] 开始下载Intel上的图像...')
+        print('INFO\t开始下载 Intel 上的图像...')
         pd = PortalUtils.PortalImageDownloader(config['portals_image_dir'])
         await pd.download_from_csv(config['portals_csv'])
-        print('')
 
     if args.update:
         asyncio.run(update())
@@ -167,16 +166,16 @@ if __name__ == '__main__':
         async def both():
             await update()
             await download()
-            print('[!] 全部完成')
+            print('INFO\t全部完成')
         asyncio.run(both())
 
     if args.solve:
-        print('[!] 开始自动处理')
+        print('INFO\t开始自动处理')
         start = time.time()
         asyncio.run(solver(config))
-        print(f'[!] 自动处理完成，用时 {time.time() - start} s')
+        print('INFO\t自动处理完成，用时 {:.2f} s'.format(time.time() - start))
     elif args.spilt:
-        print('[!] 开始自动处理')
+        print('INFO\t开始自动处理')
         start = time.time()
         asyncio.run(spilt(config))
-        print(f'[!] 自动处理完成，用时 {time.time() - start} s')
+        print('INFO\t自动处理完成，用时 {:.2f} s'.format(time.time() - start))

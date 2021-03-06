@@ -41,13 +41,13 @@ class IntelMap(object):
             client = httpx.Client(headers=self.headers, cookies=cookies_dict, proxies=self.proxies)
             test = client.get('https://intel.ingress.com/intel')
             self.data_base['v'] = re.findall('/jsc/gen_dashboard_([\d\w]+).js"', test.text)[0]
-            print('cookies success')
+            print('INFO\tCookies 正常')
             self.headers.update({'x-csrftoken': client.cookies.get('csrftoken', domain='intel.ingress.com')})
             self.client.headers = self.headers
             self.client.cookies = client.cookies
             self.__isCookieOK = True
         except IndexError:
-            print("Oops!, looks like you have a problem with your cookie.")
+            print("ERROR\tCookies 似乎有问题，请检查")
             self.__isCookieOK = False
 
     def getCookieStatus(self):

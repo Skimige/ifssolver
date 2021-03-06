@@ -32,7 +32,7 @@ class PortalsCSV(object):
     @staticmethod
     def read_csv(filename):
         if not Path(filename).exists():
-            print(f'{filename} does not found.')
+            print(f'WARN\t{filename} not found.')
             return []
         with open(filename, newline='', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
@@ -52,12 +52,12 @@ async def crawl(cookies, map_config, portals_csv):
     bbox = [map_config['lng'] - dlng, map_config['lat'] - dlat, map_config['lng'] + dlng, map_config['lat'] + dlat]
 
     tiles = MapTiles(bbox).tiles
-    print(f'[!] Tiles : {tiles}')
-    print(f'[!] Number of tiles in boundry are : {len(tiles)}')
-    print(f'[!] 正在更新Portal元数据...')
+    print(f'INFO\tTiles: {tiles}')
+    print(f'INFO\tNumber of tiles in boundry: {len(tiles)}')
+    print(f'INFO\t正在更新 Portal 元数据...')
     portals_list = [portal async for portal in PortalsIterator(client, tiles)]
     await asyncio.to_thread(PortalsCSV.write_csv, portals_csv, portals_list)
-    print(f'[!] CSV({portals_csv}) 写入成功。')
+    print(f'INFO\tCSV {portals_csv} 写入成功')
 
 
 def PortalParser(poID, poDetail):
@@ -120,12 +120,12 @@ class PortalImageDownloader(object):
     async def download_from_csv(self, portals_csv):
         portals_list = await asyncio.to_thread(PortalsCSV.read_csv, portals_csv)
         async with httpx.AsyncClient(headers=self.headers, limits=self.limits) as client:
-            print(f'[!] 正在根据({portals_csv})下载Portal图像...')
+            print(f'INFO\t正在根据 {portals_csv} 下载 Portal 图像...')
             tasks = [asyncio.create_task(self.__download_img(client, portal)) for portal in portals_list]
             unfinished = [n for n, coro in enumerate(tqdm.as_completed(tasks), 1) if await coro is False]
-            print(f'[!] 图像下载完成。')
+            print(f'INFO\t图像下载完成。')
             if any(unfinished):
-                print(f"[!] 有{len(unfinished)}个图像下载失败，请重新执行下载剩余图像。")
+                print(f"WARN\t有 {len(unfinished)} 个图像下载失败，请重新执行下载剩余图像")
 
 
 class ImageHashDatabase(object):
@@ -147,13 +147,13 @@ class ImageHashDatabase(object):
         self = ImageHashDatabase()
         self.hash_method = cls.hash_func.get(hash_method, None)
         if self.hash_method is None:
-            print(f'[!] 图像哈希方法({hash_method})不存在，退出。')
+            print(f'ERROR\t图像哈希方法 {hash_method} 不存在，退出')
             exit()
         if not Path(portals_csv).exists():
-            print(f'[!] 图像索引({portals_csv})不存在，退出。')
+            print(f'ERROR\t图像索引 {portals_csv} 不存在，退出')
             exit()
         if not Path(img_dir).exists():
-            print(f'[!] 图像目录({img_dir})不存在，退出。')
+            print(f'ERROR\t图像目录 {img_dir} 不存在，退出')
             exit()
         self.polist = await asyncio.to_thread(PortalsCSV.read_csv, portals_csv)
         self.img_dir = img_dir
@@ -173,14 +173,14 @@ class ImageHashDatabase(object):
         except:
             img.close()
             await asyncio.to_thread(img_path.unlink)
-            print(f"[!!!] 请重新下载 {po['lng']}_{po['lat']}.jpg (Po名: {po['name']})")
+            print(f"WARN\t请重新下载 {po['lng']}_{po['lat']}.jpg; Portal 名: {po['name']}")
             return None
 
     async def __init_db(self):
-        print(f'[!] 正在构建imagehash数据库...')
+        print(f'INFO\t正在构建 imagehash 数据库...')
         tasks = [asyncio.create_task(self.__getPortalHash(n, po)) for n, po in enumerate(self.polist)]
         hash_list = [result for coro in tqdm.as_completed(tasks) if (result := await coro) is not None]
-        print(f'[!] 数据库构建完成，包含{len(hash_list)}个图像imagehash结果。')
+        print(f'INFO\t数据库构建完成，包含 {len(hash_list)} 个图像 imagehash 结果。')
         return hash_list
 
     async def match(self, img):
